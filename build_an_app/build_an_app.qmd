@@ -1,0 +1,29 @@
+---
+title: "Build an App"
+format: html
+editor: visual
+---
+
+```{r}
+runApp("movies")
+```
+
+```{r}
+runApp("movie_dates")
+```
+
+```{r}
+runApp("movie_render")
+```
+
+```{r}
+runApp("movie_hovering")
+```
+
+```{r}
+runApp("movie_text")
+```
+
+```{r}
+runApp("movie_download")
+```
