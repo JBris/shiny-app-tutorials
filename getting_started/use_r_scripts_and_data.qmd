@@ -1,0 +1,11 @@
+---
+title: "Use R scripts and data"
+format: html
+editor: visual
+---
+
+## Use R scripts and data
+
+```{r}
+runApp("census-app")
+```

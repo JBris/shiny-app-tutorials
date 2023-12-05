@@ -1,0 +1,13 @@
+---
+title: "Use reactive expressions"
+format: html
+editor: visual
+---
+
+## Use reactive expressions
+
+```{r}
+runApp("stockVis")
+```
+
+ 
