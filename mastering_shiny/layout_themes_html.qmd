@@ -1,0 +1,84 @@
+---
+title: "Layout, themes, HTML"
+format: html
+editor: visual
+---
+
+## Introduction
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  titlePanel("Central limit theorem"),
+  sidebarLayout(
+    sidebarPanel(
+      numericInput("m", "Number of samples:", 2, min = 1, max = 100)
+    ),
+    mainPanel(
+      plotOutput("hist")
+    )
+  )
+)
+server <- function(input, output, session) {
+  output$hist <- renderPlot({
+    means <- replicate(1e4, mean(runif(input$m)))
+    hist(means, breaks = 20)
+  }, res = 96)
+}
+
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      textOutput("panel")
+    ),
+    mainPanel(
+      tabsetPanel(
+        id = "tabset",
+        tabPanel("panel 1", "one"),
+        tabPanel("panel 2", "two"),
+        tabPanel("panel 3", "three")
+      )
+    )
+  )
+)
+server <- function(input, output, session) {
+  output$panel <- renderText({
+    paste("Current panel: ", input$tabset)
+  })
+}
+shinyApp(ui, server)
+```
+
+
+
+
+```{r}
+library(shiny)
+
+library(ggplot2)
+
+ui <- fluidPage(
+  theme = bslib::bs_theme(bootswatch = "darkly"),
+  titlePanel("A themed plot"),
+  plotOutput("plot"),
+)
+
+server <- function(input, output, session) {
+  thematic::thematic_shiny()
+  
+  output$plot <- renderPlot({
+    ggplot(mtcars, aes(wt, mpg)) +
+      geom_point() +
+      geom_smooth()
+  }, res = 96)
+}
+shinyApp(ui, server)
+```

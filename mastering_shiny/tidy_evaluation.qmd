@@ -1,0 +1,14 @@
+---
+title: "Tidy Evaluation"
+format: html
+editor: visual
+---
+
+## Quarto
+
+
+```{r}
+#| echo: false
+2 * 2
+```
+

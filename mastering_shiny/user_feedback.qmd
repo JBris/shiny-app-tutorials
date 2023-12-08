@@ -1,0 +1,348 @@
+---
+title: "User feedback"
+format: html
+editor: visual
+---
+
+## Validation
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  shinyFeedback::useShinyFeedback(),
+  numericInput("n", "n", value = 10),
+  textOutput("half")
+)
+
+server <- function(input, output, session) {
+  half <- reactive({
+    even <- input$n %% 2 == 0
+    shinyFeedback::feedbackWarning("n", !even, "Please select an even number")
+    req(even)
+    input$n / 2    
+  })
+  
+  output$half <- renderText(half())
+}
+
+shinyApp(ui, server)
+```
+
+
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  selectInput("language", "Language", choices = c("", "English", "Maori")),
+  textInput("name", "Name"),
+  textOutput("greeting")
+)
+
+server <- function(input, output, session) {
+  greetings <- c(
+    English = "Hello", 
+    Maori = "Kia ora"
+  )
+  output$greeting <- renderText({
+    req(input$language, input$name)
+    paste0(greetings[[input$language]], " ", input$name, "!")
+  })
+}
+
+
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  numericInput("x", "x", value = 0),
+  selectInput("trans", "transformation", 
+    choices = c("square", "log", "square-root")
+  ),
+  textOutput("out")
+)
+
+server <- function(input, output, session) {
+  output$out <- renderText({
+    if (input$x < 0 && input$trans %in% c("log", "square-root")) {
+      validate("x can not be negative for this transformation")
+    }
+    
+    switch(input$trans,
+      square = input$x ^ 2,
+      "square-root" = sqrt(input$x),
+      log = log(input$x)
+    )
+  })
+}
+shinyApp(ui, server)
+```
+
+## Notifications
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  actionButton("goodnight", "Good night")
+)
+server <- function(input, output, session) {
+  observeEvent(input$goodnight, {
+    showNotification("So long")
+    Sys.sleep(1)
+    showNotification("Farewell")
+    Sys.sleep(1)
+    showNotification("Auf Wiedersehen")
+    Sys.sleep(1)
+    showNotification("Adieu")
+  })
+}
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  tableOutput("data")
+)
+
+server <- function(input, output, session) {
+  notify <- function(msg, id = NULL) {
+    showNotification(msg, id = id, duration = NULL, closeButton = FALSE)
+  }
+
+  data <- reactive({ 
+    id <- notify("Reading data...")
+    on.exit(removeNotification(id), add = TRUE)
+    Sys.sleep(1)
+      
+    notify("Reticulating splines...", id = id)
+    Sys.sleep(1)
+    
+    notify("Herding llamas...", id = id)
+    Sys.sleep(1)
+
+    notify("Orthogonalizing matrices...", id = id)
+    Sys.sleep(1)
+        
+    mtcars
+  })
+  
+  output$data <- renderTable(head(data()))
+}
+shinyApp(ui, server)
+```
+
+## Progress bars
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  numericInput("steps", "How many steps?", 10),
+  actionButton("go", "go"),
+  textOutput("result")
+)
+
+server <- function(input, output, session) {
+  data <- eventReactive(input$go, {
+    withProgress(message = "Computing random number", {
+      for (i in seq_len(input$steps)) {
+        Sys.sleep(0.5)
+        incProgress(1 / input$steps)
+      }
+      runif(1)
+    })
+  })
+  
+  output$result <- renderText(round(data(), 2))
+}
+
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+uui <- fluidPage(
+  waiter::use_waiter(),
+  actionButton("go", "go"),
+  textOutput("result")
+)
+
+server <- function(input, output, session) {
+  data <- eventReactive(input$go, {
+    waiter <- waiter::Waiter$new()
+    waiter$show()
+    on.exit(waiter$hide())
+    
+    Sys.sleep(sample(5, 1))
+    runif(1)
+  })
+  output$result <- renderText(round(data(), 2))
+}
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  waiter::use_waiter(),
+  actionButton("go", "go"),
+  textOutput("result")
+)
+
+server <- function(input, output, session) {
+  data <- eventReactive(input$go, {
+    waiter <- waiter::Waiter$new()
+    waiter$show()
+    on.exit(waiter$hide())
+    
+    Sys.sleep(sample(5, 1))
+    runif(1)
+  })
+  output$result <- renderText(round(data(), 2))
+}
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  waiter::use_waiter(),
+  actionButton("go", "go"),
+  plotOutput("plot"),
+)
+
+server <- function(input, output, session) {
+  data <- eventReactive(input$go, {
+    waiter::Waiter$new(id = "plot")$show()
+    
+    Sys.sleep(3)
+    data.frame(x = runif(50), y = runif(50))
+  })
+  
+  output$plot <- renderPlot(plot(data()), res = 96)
+}
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+library(shinycssloaders)
+
+ui <- fluidPage(
+  actionButton("go", "go"),
+  withSpinner(plotOutput("plot")),
+)
+server <- function(input, output, session) {
+  data <- eventReactive(input$go, {
+    Sys.sleep(3)
+    data.frame(x = runif(50), y = runif(50))
+  })
+  
+  output$plot <- renderPlot(plot(data()), res = 96)
+}
+shinyApp(ui, server)
+```
+
+## Confirming and undoing
+
+```{r}
+library(shiny)
+library(shinycssloaders)
+
+modal_confirm <- modalDialog(
+  "Are you sure you want to continue?",
+  title = "Deleting files",
+  footer = tagList(
+    actionButton("cancel", "Cancel"),
+    actionButton("ok", "Delete", class = "btn btn-danger")
+  )
+)
+
+ui <- fluidPage(
+  actionButton("delete", "Delete all files?")
+)
+server <- function(input, output, session) {
+  observeEvent(input$delete, {
+    showModal(modal_confirm)
+  })
+  
+  observeEvent(input$ok, {
+    showNotification("Files deleted")
+    removeModal()
+  })
+  observeEvent(input$cancel, {
+    removeModal()
+  })
+}
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+library(shinycssloaders)
+
+modal_confirm <- modalDialog(
+  "Are you sure you want to continue?",
+  title = "Deleting files",
+  footer = tagList(
+    actionButton("cancel", "Cancel"),
+    actionButton("ok", "Delete", class = "btn btn-danger")
+  )
+)
+
+ui <- fluidPage(
+  textAreaInput("message", 
+    label = NULL, 
+    placeholder = "What's happening?",
+    rows = 3
+  ),
+  actionButton("tweet", "Tweet")
+)
+runLater <- function(action, seconds = 3) {
+  observeEvent(
+    invalidateLater(seconds * 1000), action, 
+    ignoreInit = TRUE, 
+    once = TRUE, 
+    ignoreNULL = FALSE,
+    autoDestroy = FALSE
+  )
+}
+
+server <- function(input, output, session) {
+  waiting <- NULL
+  last_message <- NULL
+  
+  observeEvent(input$tweet, {
+    notification <- glue::glue("Tweeted '{input$message}'")
+    last_message <<- input$message
+    updateTextAreaInput(session, "message", value = "")
+
+    showNotification(
+      notification,
+      action = actionButton("undo", "Undo?"),
+      duration = NULL,
+      closeButton = FALSE,
+      id = "tweeted",
+      type = "warning"
+    )
+
+    waiting <<- runLater({
+      cat("Actually sending tweet...\n")
+      removeNotification("tweeted")
+    })
+  })
+  
+  observeEvent(input$undo, {
+    waiting$destroy()
+    showNotification("Tweet retracted", id = "tweeted")
+    updateTextAreaInput(session, "message", value = last_message)
+  })
+}
+shinyApp(ui, server)
+```

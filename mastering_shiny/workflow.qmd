@@ -1,0 +1,122 @@
+---
+title: "Workflow"
+format: html
+editor: visual
+---
+
+## Workflow
+
+```{r}
+library(shiny)
+
+f <- function(x) g(x)
+g <- function(x) h(x)
+h <- function(x) x * 2
+
+ui <- fluidPage(
+  selectInput("n", "N", 1:10),
+  plotOutput("plot")
+)
+server <- function(input, output, session) {
+  output$plot <- renderPlot({
+    n <- f(input$n)
+    plot(head(cars, n))
+  }, res = 96)
+}
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  sliderInput("x", "x", value = 1, min = 0, max = 10),
+  sliderInput("y", "y", value = 2, min = 0, max = 10),
+  sliderInput("z", "z", value = 3, min = 0, max = 10),
+  textOutput("total")
+)
+server <- function(input, output, session) {
+  observeEvent(input$x, {
+    message(glue("Updating y from {input$y} to {input$x * 2}"))
+    updateSliderInput(session, "y", value = input$x * 2)
+  })
+  
+  total <- reactive({
+    total <- input$x + input$y + input$z
+    message(glue("New total is {total}"))
+    total
+  })
+  
+  output$total <- renderText({
+    total()
+  })
+}
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  selectInput("n", "N", 1:10),
+  plotOutput("plot")
+)
+server <- function(input, output, session) {
+  output$plot <- renderPlot({
+    n <- input$n * 2
+    plot(head(cars, n))
+  })
+}
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(xts)
+library(lubridate)
+library(shiny)
+
+ui <- fluidPage(
+  uiOutput("interaction_slider"),
+  verbatimTextOutput("breaks")
+)
+server <- function(input, output, session) {
+  df <- data.frame(
+    dateTime = c(
+      "2019-08-20 16:00:00",
+      "2019-08-20 16:00:01",
+      "2019-08-20 16:00:02",
+      "2019-08-20 16:00:03",
+      "2019-08-20 16:00:04",
+      "2019-08-20 16:00:05"
+    ),
+    var1 = c(9, 8, 11, 14, 16, 1),
+    var2 = c(3, 4, 15, 12, 11, 19),
+    var3 = c(2, 11, 9, 7, 14, 1)
+  )
+
+  timeSeries <- as.xts(df[, 2:4], 
+    order.by = strptime(df[, 1], format = "%Y-%m-%d %H:%M:%S")
+  )
+  print(paste(min(time(timeSeries)), is.POSIXt(min(time(timeSeries))), sep = " "))
+  print(paste(max(time(timeSeries)), is.POSIXt(max(time(timeSeries))), sep = " "))
+
+  output$interaction_slider <- renderUI({
+    sliderInput(
+      "slider",
+      "Select Range:",
+      min = min(time(timeSeries)),
+      max = max(time(timeSeries)),
+      value = c(min, max)
+    )
+  })
+
+  brks <- reactive({
+    req(input$slider)
+    seq(input$slider[1], input$slider[2], length.out = 10)
+  })
+
+  output$breaks <- brks
+}
+shinyApp(ui, server)
+```
