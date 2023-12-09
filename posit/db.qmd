@@ -1,0 +1,218 @@
+---
+title: "Databases"
+format: html
+editor: visual
+---
+
+## Database basics - dplyr and DBI
+
+ 
+```{r}
+library(DBI)
+conn <- dbConnect(
+    drv = RMySQL::MySQL(),
+    dbname = "shinydemo",
+    host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+    username = "guest",
+    password = "guest")
+rs <- dbSendQuery(conn, "SELECT * FROM City LIMIT 5;")
+dbFetch(rs)
+
+dbClearResult(rs)
+dbDisconnect(conn)
+```
+
+```{r}
+library(DBI)
+conn <- dbConnect(
+    drv = RMySQL::MySQL(),
+    dbname = "shinydemo",
+    host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+    username = "guest",
+    password = "guest")
+dbGetQuery(conn, "SELECT * FROM City LIMIT 5;")
+##   ID           Name CountryCode      District Population
+## 1  1          Kabul         AFG         Kabol    1780000
+## 2  2       Qandahar         AFG      Qandahar     237500
+## 3  3          Herat         AFG         Herat     186800
+## 4  4 Mazar-e-Sharif         AFG         Balkh     127800
+## 5  5      Amsterdam         NLD Noord-Holland     731200
+dbDisconnect(conn)
+```
+
+```{r}
+library(shiny)
+library(DBI)
+
+ui <- fluidPage(
+  numericInput("nrows", "Enter the number of rows to display:", 5),
+  tableOutput("tbl")
+)
+
+server <- function(input, output, session) {
+  output$tbl <- renderTable({
+    conn <- dbConnect(
+      drv = RMySQL::MySQL(),
+      dbname = "shinydemo",
+      host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+      username = "guest",
+      password = "guest")
+    on.exit(dbDisconnect(conn), add = TRUE)
+    dbGetQuery(conn, paste0(
+      "SELECT * FROM City LIMIT ", input$nrows, ";"))
+  })
+}
+
+shinyApp(ui, server)
+
+```
+
+## SQL injection prevention
+
+
+```{r}
+library(shiny)
+library(DBI)
+
+ui <- fluidPage(
+  p("Enter up to three IDs:"),
+  textInput("ID1", "First ID:", "5"),
+  textInput("ID2", "Second ID:", ""),
+  textInput("ID3", "Third ID:", ""),
+  tableOutput("tbl")
+)
+
+server <- function(input, output, session) {
+  output$tbl <- renderTable({
+    conn <- dbConnect(
+      drv = RMySQL::MySQL(),
+      dbname = "shinydemo",
+      host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+      username = "guest",
+      password = "guest")
+    on.exit(dbDisconnect(conn), add = TRUE)
+    sql <- "SELECT * FROM City WHERE ID = ?id1 OR ID = ?id2 OR ID = ?id3;"
+    query <- sqlInterpolate(conn, sql, id1 = input$ID1,
+                            id2 = input$ID2, id3 = input$ID3)
+    dbGetQuery(conn, query)
+  })
+}
+
+shinyApp(ui, server)
+
+```
+
+## Using the pool package (basics)
+
+```{r}
+library(shiny)
+library(DBI)
+library(pool)
+
+pool <- dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "shinydemo",
+  host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+  username = "guest",
+  password = "guest"
+)
+
+ui <- fluidPage(
+  textInput("ID", "Enter your ID:", "5"),
+  tableOutput("tbl"),
+  numericInput("nrows", "How many cities to show?", 10),
+  plotOutput("popPlot")
+)
+
+server <- function(input, output, session) {
+  output$tbl <- renderTable({
+    sql <- "SELECT * FROM City WHERE ID = ?id;"
+    query <- sqlInterpolate(pool, sql, id = input$ID)
+    dbGetQuery(pool, query)
+  })
+  output$popPlot <- renderPlot({
+    query <- paste0("SELECT * FROM City LIMIT ",
+                    as.integer(input$nrows)[1], ";")
+    df <- dbGetQuery(pool, query)
+    pop <- df$Population
+    names(pop) <- df$Name
+    barplot(pop)
+  })
+}
+
+shinyApp(ui, server)
+```
+
+## Using the pool package (advanced)
+
+```{r}
+library(DBI)
+library(pool)
+
+pool <- dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "shinydemo",
+  host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+  username = "guest",
+  password = "guest"
+)
+
+dbGetInfo(pool)
+```
+
+```{r}
+library(DBI)
+library(pool)
+
+pool <- dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "shinydemo",
+  host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+  username = "guest",
+  password = "guest",
+  minSize = 10,
+  maxSize = Inf,    # this could have been omitted since it's the default
+  idleTimeout = 3600000  # one hour
+)
+
+dbGetInfo(pool)
+```
+
+## Using dplyr and pool to query a database
+ 
+```{r}
+library(shiny)
+library(DBI)
+library(pool)
+
+pool <- dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "shinydemo",
+  host = "shiny-demo.csa7qlmguqrf.us-east-1.rds.amazonaws.com",
+  username = "guest",
+  password = "guest"
+)
+
+ui <- fluidPage(
+  textInput("ID", "Enter your ID:", "5"),
+  tableOutput("tbl"),
+  numericInput("nrows", "How many cities to show?", 10),
+  plotOutput("popPlot")
+)
+
+server <- function(input, output, session) {
+  output$tbl <- renderTable({
+    pool %>% tbl("City") %>%
+      filter(ID == input$ID)
+  })
+  output$popPlot <- renderPlot({
+    df <- pool %>% tbl("City") %>%
+      head(as.integer(input$nrows)[1]) %>% collect()
+    pop <- df$Population
+    names(pop) <- df$Name
+    barplot(pop)
+  })
+}
+
+shinyApp(ui, server)
+```

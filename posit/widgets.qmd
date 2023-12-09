@@ -1,0 +1,311 @@
+---
+title: "Widgets"
+format: html
+editor: visual
+---
+
+## Modal dialogs
+
+
+```{r}
+shinyApp(
+  ui = basicPage(
+    actionButton("show", "Show modal dialog")
+  ),
+  server = function(input, output) {
+    observeEvent(input$show, {
+      showModal(modalDialog(
+        title = "Important message",
+        "This is an important message!",
+        easyClose = TRUE
+      ))
+    })
+  }
+)
+```
+
+## Notifications
+
+```{r}
+shinyApp(
+  ui = fluidPage(
+    actionButton("show", "Show")
+  ),
+  server = function(input, output) {
+    observeEvent(input$show, {
+      showNotification("This is a notification.")
+    })
+  }
+)
+```
+
+```{r}
+shinyApp(
+  ui = fluidPage(
+    actionButton("show", "Show"),
+    actionButton("remove", "Remove")
+  ),
+  server = function(input, output) {
+    # A notification ID
+    id <- NULL
+
+    observeEvent(input$show, {
+      # If there's currently a notification, don't add another
+      if (!is.null(id))
+        return()
+      # Save the ID for removal later
+      id <<- showNotification(paste("Notification message"), duration = 0)
+    })
+
+    observeEvent(input$remove, {
+      if (!is.null(id))
+        removeNotification(id)
+      id <<- NULL
+    })
+  }
+)
+```
+
+## Tabsets
+ 
+```{r}
+library(shiny)
+# Define UI for random distribution app ----
+ui <- fluidPage(
+
+  # App title ----
+  titlePanel("Tabsets"),
+
+  # Sidebar layout with input and output definitions ----
+  sidebarLayout(
+
+    # Sidebar panel for inputs ----
+    sidebarPanel(
+
+      # Input: Select the random distribution type ----
+      radioButtons("dist", "Distribution type:",
+                   c("Normal" = "norm",
+                     "Uniform" = "unif",
+                     "Log-normal" = "lnorm",
+                     "Exponential" = "exp")),
+
+      # br() element to introduce extra vertical spacing ----
+      br(),
+
+      # Input: Slider for the number of observations to generate ----
+      sliderInput("n",
+                  "Number of observations:",
+                  value = 500,
+                  min = 1,
+                  max = 1000)
+
+    ),
+
+    # Main panel for displaying outputs ----
+    mainPanel(
+
+      # Output: Tabset w/ plot, summary, and table ----
+      tabsetPanel(type = "tabs",
+                  tabPanel("Plot", plotOutput("plot")),
+                  tabPanel("Summary", verbatimTextOutput("summary")),
+                  tabPanel("Table", tableOutput("table"))
+      )
+
+    )
+  )
+)
+
+# Define server logic for random distribution app ----
+server <- function(input, output) {
+
+  # Reactive expression to generate the requested distribution ----
+  # This is called whenever the inputs change. The output functions
+  # defined below then use the value computed from this expression
+  d <- reactive({
+    dist <- switch(input$dist,
+                   norm = rnorm,
+                   unif = runif,
+                   lnorm = rlnorm,
+                   exp = rexp,
+                   rnorm)
+
+    dist(input$n)
+  })
+
+  # Generate a plot of the data ----
+  # Also uses the inputs to build the plot label. Note that the
+  # dependencies on the inputs and the data reactive expression are
+  # both tracked, and all expressions are called in the sequence
+  # implied by the dependency graph.
+  output$plot <- renderPlot({
+    dist <- input$dist
+    n <- input$n
+
+    hist(d(),
+         main = paste("r", dist, "(", n, ")", sep = ""),
+         col = "#007bc2", border = "white")
+  })
+
+  # Generate a summary of the data ----
+  output$summary <- renderPrint({
+    summary(d())
+  })
+
+  # Generate an HTML table view of the data ----
+  output$table <- renderTable({
+    d()
+  })
+
+}
+
+shinyApp(ui, server)
+```
+
+## Progress indicators
+
+```{r}
+server <- function(input, output) {
+  output$plot <- renderPlot({
+    input$goPlot # Re-run when button is clicked
+
+    # Create 0-row data frame which will be used to store data
+    dat <- data.frame(x = numeric(0), y = numeric(0))
+
+    withProgress(message = 'Making plot', value = 0, {
+      # Number of times we'll go through the loop
+      n <- 10
+
+      for (i in 1:n) {
+        # Each time through the loop, add another row of data. This is
+        # a stand-in for a long-running computation.
+        dat <- rbind(dat, data.frame(x = rnorm(1), y = rnorm(1)))
+
+        # Increment the progress bar, and update the detail text.
+        incProgress(1/n, detail = paste("Doing part", i))
+
+        # Pause for 0.1 seconds to simulate a long computation.
+        Sys.sleep(0.1)
+      }
+    })
+
+    plot(dat$x, dat$y)
+  })
+}
+
+ui <- shinyUI(basicPage(
+  plotOutput('plot', width = "300px", height = "300px"),
+  actionButton('goPlot', 'Go plot')
+))
+
+shinyApp(ui = ui, server = server)
+
+```
+
+```{r}
+server <- function(input, output) {
+  output$plot <- renderPlot({
+    input$goPlot # Re-run when button is clicked
+
+    # Create 0-row data frame which will be used to store data
+    dat <- data.frame(x = numeric(0), y = numeric(0))
+
+    # Create a Progress object
+    progress <- shiny::Progress$new()
+    # Make sure it closes when we exit this reactive, even if there's an error
+    on.exit(progress$close())
+
+    progress$set(message = "Making plot", value = 0)
+
+    # Number of times we'll go through the loop
+    n <- 10
+
+    for (i in 1:n) {
+      # Each time through the loop, add another row of data. This is
+      # a stand-in for a long-running computation.
+      dat <- rbind(dat, data.frame(x = rnorm(1), y = rnorm(1)))
+
+      # Increment the progress bar, and update the detail text.
+      progress$inc(1/n, detail = paste("Doing part", i))
+
+      # Pause for 0.1 seconds to simulate a long computation.
+      Sys.sleep(0.1)
+    }
+
+    plot(dat$x, dat$y)
+  })
+}
+
+ui <- shinyUI(basicPage(
+  plotOutput('plot', width = "300px", height = "300px"),
+  actionButton('goPlot', 'Go plot')
+))
+
+shinyApp(ui = ui, server = server)
+
+```
+
+
+```{r}
+# This function computes a new data set. It can optionally take a function,
+# updateProgress, which will be called as each row of data is added.
+compute_data <- function(updateProgress = NULL) {
+  # Create 0-row data frame which will be used to store data
+  dat <- data.frame(x = numeric(0), y = numeric(0))
+
+  for (i in 1:10) {
+    Sys.sleep(0.25)
+  
+    # Compute new row of data
+    new_row <- data.frame(x = rnorm(1), y = rnorm(1))
+
+    # If we were passed a progress update function, call it
+    if (is.function(updateProgress)) {
+      text <- paste0("x:", round(new_row$x, 2), " y:", round(new_row$y, 2))
+      updateProgress(detail = text)
+    }
+
+    # Add the new row of data
+    dat <- rbind(dat, new_row)
+  }
+
+  dat
+}
+
+
+server <- function(input, output) {
+  output$table <- renderTable({
+    input$goTable
+
+    # Create a Progress object
+    progress <- shiny::Progress$new()
+    progress$set(message = "Computing data", value = 0)
+    # Close the progress when this reactive exits (even if there's an error)
+    on.exit(progress$close())
+    
+    # Create a callback function to update progress.
+    # Each time this is called:
+    # - If `value` is NULL, it will move the progress bar 1/5 of the remaining
+    #   distance. If non-NULL, it will set the progress to that value.
+    # - It also accepts optional detail text.
+    updateProgress <- function(value = NULL, detail = NULL) {
+      if (is.null(value)) {
+        value <- progress$getValue()
+        value <- value + (progress$getMax() - value) / 5
+      }
+      progress$set(value = value, detail = detail)
+    }
+
+    # Compute the new data, and pass in the updateProgress function so
+    # that it can update the progress indicator.
+    compute_data(updateProgress)
+  })
+}
+
+ui <- shinyUI(basicPage(
+  tableOutput('table'),
+  actionButton('goTable', 'Go table')
+))
+
+shinyApp(ui = ui, server = server)
+
+```
