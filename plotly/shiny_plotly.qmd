@@ -1,0 +1,293 @@
+---
+title: "Shiny Plotly"
+format: html
+editor: visual
+---
+
+## Server-side linking with shiny
+
+```{r}
+library(shiny)
+library(plotly)
+
+ui <- fluidPage(
+  selectizeInput(
+    inputId = "cities", 
+    label = "Select a city", 
+    choices = unique(txhousing$city), 
+    selected = "Abilene",
+    multiple = TRUE
+  ),
+  plotlyOutput(outputId = "p")
+)
+
+server <- function(input, output, ...) {
+  output$p <- renderPlotly({
+    plot_ly(txhousing, x = ~date, y = ~median) %>%
+      filter(city %in% input$cities) %>%
+      group_by(city) %>%
+      add_lines()
+  })
+}
+
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+
+cities <- unique(txhousing$city)
+
+ui <- fluidPage(
+  selectizeInput(
+    inputId = "cities", 
+    label = NULL,
+    # placeholder is enabled when 1st choice is an empty string
+    choices = c("Please choose a city" = "", cities), 
+    multiple = TRUE
+  ),
+  plotlyOutput(outputId = "p")
+)
+
+server <- function(input, output, session, ...) {
+  output$p <- renderPlotly({
+    req(input$cities)
+    if (identical(input$cities, "")) return(NULL)
+    p <- ggplot(data = filter(txhousing, city %in% input$cities)) + 
+      geom_line(aes(date, median, group = city))
+    height <- session$clientData$output_p_height
+    width <- session$clientData$output_p_width
+    ggplotly(p, height = height, width = width)
+  })
+}
+
+shinyApp(ui, server)
+```
+
+
+```{r}
+plotly_example("shiny", "event_data")
+plotly_example("shiny", "event_data_3D")
+```
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  plotlyOutput("p"),
+  verbatimTextOutput("event")
+)
+
+server <- function(input, output, session) {
+  
+  output$p <- renderPlotly({
+    plot_ly() %>%
+      layout(
+        xaxis = list(range = c(-10, 10)),
+        yaxis = list(range = c(-10, 10)),
+        shapes = list(
+          type = "circle", 
+          fillcolor = "gray",
+          line = list(color = "gray"),
+          x0 = -10, x1 = 10,
+          y0 = -10, y1 = 10,
+          xsizemode = "pixel", 
+          ysizemode = "pixel",
+          xanchor = 0, yanchor = 0
+        )
+      ) %>%
+      config(edits = list(shapePosition = TRUE))
+  })
+  
+  output$event <- renderPrint({
+    event_data("plotly_relayout")
+  })
+  
+}
+
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  plotlyOutput("parcoords"),
+  verbatimTextOutput("info")
+)
+
+server <- function(input, output, session) {
+  
+  d <- dplyr::select_if(iris, is.numeric)
+  
+  output$parcoords <- renderPlotly({
+    
+    dims <- Map(function(x, y) {
+      list(
+        values = x, 
+        range = range(x, na.rm = TRUE), 
+        label = y
+      )
+    }, d, names(d), USE.NAMES = FALSE)
+    
+    plot_ly() %>%
+      add_trace(
+        type = "parcoords",
+        dimensions = dims
+      ) %>%
+      event_register("plotly_restyle")
+  })
+  
+  output$info <- renderPrint({
+    d <- event_data("plotly_restyle")
+    if (is.null(d)) "Brush along a dimension" else d
+  })
+  
+}
+
+shinyApp(ui, server)
+
+```
+
+```{r}
+library(shiny)
+
+# cache computation of the correlation matrix
+correlation <- round(cor(mtcars), 3)
+
+ui <- fluidPage(
+  plotlyOutput("heat"),
+  plotlyOutput("scatterplot")
+)
+
+server <- function(input, output, session) {
+  
+  output$heat <- renderPlotly({
+    plot_ly(source = "heat_plot") %>%
+      add_heatmap(
+        x = names(mtcars), 
+        y = names(mtcars), 
+        z = correlation
+      )
+  })
+  
+  output$scatterplot <- renderPlotly({
+    # if there is no click data, render nothing!
+    clickData <- event_data("plotly_click", source = "heat_plot")
+    if (is.null(clickData)) return(NULL)
+    
+    # Obtain the clicked x/y variables and fit linear model
+    vars <- c(clickData[["x"]], clickData[["y"]])
+    d <- setNames(mtcars[vars], c("x", "y"))
+    yhat <- fitted(lm(y ~ x, data = d))
+    
+    # scatterplot with fitted line
+    plot_ly(d, x = ~x) %>%
+      add_markers(y = ~y) %>%
+      add_lines(y = ~yhat) %>%
+      layout(
+        xaxis = list(title = clickData[["x"]]), 
+        yaxis = list(title = clickData[["y"]]), 
+        showlegend = FALSE
+      )
+  })
+  
+}
+
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+  plotlyOutput("p"),
+  textOutput("time1"),
+  textOutput("time2")
+)
+
+server <- function(input, output, session) {
+  
+  output$p <- renderPlotly({
+    plot_ly(x = 1:2, y = 1:2, size = I(c(100, 150)))  %>%
+      add_markers()
+  })
+  
+  output$time1 <- renderText({
+    event_data("plotly_click")
+    paste("Input priority: ", Sys.time())
+  })
+  
+  output$time2 <- renderText({
+    event_data("plotly_click", priority = "event")
+    paste("Event priority: ", Sys.time())
+  })
+  
+}
+
+shinyApp(ui, server)
+
+
+```
+
+
+```{r}
+ 
+library(shiny)
+library(plotly)
+
+# Generate 100,000 observations from 2 correlated random variables
+s <- matrix(c(1, 0.5, 0.5, 1), 2, 2)
+d <- MASS::mvrnorm(1e6, mu = c(0, 0), Sigma = s)
+d <- setNames(as.data.frame(d), c("x", "y"))
+
+# fit a simple linear model
+m <- lm(y ~ x, data = d)
+
+# generate y predictions over a grid of 10 x values
+dpred <- data.frame(
+  x = seq(min(d$x), max(d$x), length.out = 10)
+)
+dpred$yhat <- predict(m, newdata = dpred)
+
+ui <- fluidPage(
+  plotlyOutput("scatterplot"),
+  checkboxInput(
+    "smooth", 
+    label = "Overlay fitted line?", 
+    value = FALSE
+  )
+)
+
+server <- function(input, output, session) {
+  
+  output$scatterplot <- renderPlotly({
+    
+    p <- plot_ly(d, x   = ~x, y = ~y) %>%
+      add_markers(color = I("black"), alpha = 0.05) %>%
+      toWebGL() %>%
+      layout(showlegend = FALSE)
+    
+    if (!input$smooth) return(p)
+    
+    add_lines(p, data = dpred, x = ~x, y = ~yhat, color = I("red"))
+  })
+  
+}
+
+shinyApp(ui, server)
+
+```
+
+
+```{r}
+plotly_example("shiny", "proxy_restyle_economics")
+```
+
+```{r}
+plotly_example("shiny", "proxy_mapbox")
+```
+
+```{r}
+plotly_example("shiny", "stream")
+```

@@ -1,0 +1,170 @@
+---
+title: "Plotly"
+format: html
+editor: visual
+---
+
+## Intro to ggplotly()
+
+```{r}
+p <- ggplot(diamonds, aes(x = log(carat), y = log(price))) + 
+  geom_hex(bins = 100)
+ggplotly(p)
+```
+
+```{r}
+p <- ggplot(diamonds, aes(x=clarity, y=log(price), color=clarity)) +
+    ggforce::geom_sina(alpha = 0.1) + 
+    stat_summary(fun.data = "mean_cl_boot", color = "black") +
+    facet_wrap(~cut)
+
+# WebGL is a lot more efficient at rendering lots of points
+toWebGL(ggplotly(p))
+```
+
+## Scatter traces
+
+```{r}
+library(plotly)
+data(economics, package = "ggplot2")
+
+# sort economics by psavert, just to 
+# show difference between paths and lines
+p <- economics %>%
+  arrange(psavert) %>%
+  plot_ly(x = ~date, y = ~psavert)
+
+add_paths(p)
+add_lines(p)
+```
+
+```{r}
+library(dplyr)
+top5 <- txhousing %>%
+  group_by(city) %>%
+  summarise(m = mean(sales, na.rm = TRUE)) %>%
+  arrange(desc(m)) %>%
+  top_n(5)
+
+tx5 <- semi_join(txhousing, top5, by = "city")
+
+plot_ly(tx5, x = ~date, y = ~median) %>%
+  add_lines(linetype = ~city)
+```
+
+## Maps
+
+```{r}
+library(plotly)
+map1 <- plot_mapbox() %>% 
+  add_segments(x = -100, xend = -50, y = 50, yend = 75) %>%
+  layout(
+    mapbox = list(
+      zoom = 0,
+      center = list(lat = 65, lon = -75)
+    )
+  )
+
+map2 <- plot_geo() %>% 
+  add_segments(x = -100, xend = -50, y = 50, yend = 75) %>%
+  layout(geo = list(projection = list(type = "mercator")))
+
+library(htmltools)
+browsable(tagList(map1, map2))
+```
+
+## 3D charts
+
+```{r}
+library(plotly)
+plot_ly(mpg, x = ~cty, y = ~hwy, z = ~cyl) %>%
+  add_markers(color = ~cyl) %>%
+  add_paths(color = ~displ)
+```
+
+```{r}
+library(plotly)
+x <- seq_len(nrow(volcano)) + 100
+y <- seq_len(ncol(volcano)) + 500
+plot_ly() %>% add_surface(x = ~x, y = ~y, z = ~volcano)
+```
+
+## Client-side linking
+
+```{r}
+library(plotly)
+mtcars %>%
+  highlight_key(~cyl) %>%
+  plot_ly(
+    x = ~wt, y = ~mpg, text = ~cyl, mode = "markers+text", 
+    textposition = "top", hoverinfo = "x+y"
+  ) %>%
+  highlight(on = "plotly_hover", off = "plotly_doubleclick")
+```
+
+```{r}
+# load the `txhousing` dataset
+data(txhousing, package = "ggplot2")
+
+# declare `city` as the SQL 'query by' column
+tx <- highlight_key(txhousing, ~city)
+
+# initiate a plotly object
+base <- plot_ly(tx, color = I("black")) %>% 
+  group_by(city)
+
+# create a time series of median house price
+base %>%
+  group_by(city) %>%
+  add_lines(x = ~date, y = ~median)
+```
+
+```{r}
+# (`txhousing` with `city` as a grouping and querying variable)
+dot_plot <- base %>%
+  summarise(miss = sum(is.na(median))) %>%
+  filter(miss > 0) %>%
+  add_markers(
+    x = ~miss, 
+    y = ~forcats::fct_reorder(city, miss), 
+    hoverinfo = "x+y"
+  ) %>%
+  layout(
+    xaxis = list(title = "Number of months missing"),
+    yaxis = list(title = "")
+  ) 
+
+subplot(dot_plot, time_series, widths = c(.2, .8), titleX = TRUE) %>%
+  layout(showlegend = FALSE) %>%
+  highlight(on = "plotly_selected", dynamic = TRUE, selectize = TRUE)
+```
+
+```{r}
+library(leaflet)
+library(crosstalk)
+
+eqs <- highlight_key(quakes)
+stations <- filter_slider(
+  "station", "Number of Stations", 
+  eqs, ~stations
+)
+
+p <- plot_ly(eqs, x = ~depth, y = ~mag) %>% 
+  add_markers(alpha = 0.5) %>% 
+  highlight("plotly_selected")
+
+map <- leaflet(eqs) %>% 
+  addTiles() %>% 
+  addCircles()
+
+bscols(
+  widths = c(6, 6, 3), 
+  p, map, stations
+)
+```
+
+ 
+
+```{r}
+demo("sf-plotly-3D-globe", package = "plotly")
+```

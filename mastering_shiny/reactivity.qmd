@@ -1,0 +1,219 @@
+---
+title: "Reactivity"
+format: html
+editor: visual
+---
+
+## Reactive programming
+
+```{r}
+library(shiny)
+reactiveConsole(TRUE)
+
+temp_c <- reactiveVal(10) 
+
+temp_f <- reactive({
+  message("Converting") 
+  (temp_c() * 9 / 5) + 32
+})
+temp_f()
+```
+
+## Reactive graph
+
+
+```{r}
+
+library(shiny)
+ui <- fluidPage(
+  numericInput("a", "a", value = 10),
+  numericInput("b", "b", value = 1),
+  numericInput("c", "c", value = 1),
+  plotOutput("x"),
+  tableOutput("y"),
+  textOutput("z")
+)
+
+server <- function(input, output, session) {
+  rng <- reactive(input$a * 2)
+  smp <- reactive(sample(rng(), input$b, replace = TRUE))
+  bc <- reactive(input$b * input$c)
+  
+  output$x <- renderPlot(hist(smp()))
+  output$y <- renderTable(max(smp()))
+  output$z <- renderText(bc())
+}
+
+shinyApp(ui, server)
+```
+
+## Dynamism
+
+
+```{r}
+
+library(shiny)
+ui <- fluidPage(
+  selectInput("choice", "A or B?", c("a", "b")),
+  numericInput("a", "a", 0),
+  numericInput("b", "b", 10),
+  textOutput("out")
+)
+
+server <- function(input, output, session) {
+  output$out <- renderText({
+    if (input$choice == "a") {
+      input$a
+    } else {
+      input$b
+    }
+  }) 
+}
+shinyApp(ui, server)
+```
+
+## Reactive building blocks
+ 
+```{r}
+library(shiny)
+reactiveConsole(TRUE)
+
+x <- reactiveVal(10)
+r <- reactiveValues(x = 10)
+
+l1 <- reactiveValues(a = 1, b = 2)
+l2 <- list(a = reactiveVal(1), b = reactiveVal(2))
+```
+
+## Escaping the graph
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  textInput("nm", "name"),
+  actionButton("clr", "Clear"),
+  textOutput("hi")
+)
+server <- function(input, output, session) {
+  hi <- reactive(paste0("Hi ", input$nm))
+  output$hi <- renderText(hi())
+  observeEvent(input$clr, {
+    updateTextInput(session, "nm", value = "")
+  })
+}
+
+shinyApp(ui, server)
+```
+
+
+```{r}
+ui <- fluidPage(
+  actionButton("drink", "drink me"),
+  actionButton("eat", "eat me"),
+  textOutput("notice")
+)
+server <- function(input, output, session) {
+  r <- reactiveValues(notice = "")
+  observeEvent(input$drink, {
+    r$notice <- "You are no longer thirsty"
+  })
+  observeEvent(input$eat, {
+    r$notice <- "You are no longer hungry"
+  })
+  output$notice <- renderText(r$notice)
+}
+
+shinyApp(ui, server)
+```
+
+```{r}
+ui <- fluidPage(
+  actionButton("up", "up"),
+  actionButton("down", "down"),
+  textOutput("n")
+)
+server <- function(input, output, session) {
+  r <- reactiveValues(n = 0)
+  observeEvent(input$up, {
+    r$n <- r$n + 1
+  })
+  observeEvent(input$down, {
+    r$n <- r$n - 1
+  })
+  
+  output$n <- renderText(r$n)
+}
+shinyApp(ui, server)
+```
+### Accumulating inputs
+
+```{r}
+ui <- fluidPage(
+  textInput("name", "name"),
+  actionButton("add", "add"),
+  textOutput("names")
+)
+server <- function(input, output, session) {
+  r <- reactiveValues(names = character())
+  observeEvent(input$add, {
+    r$names <- c(input$name, r$names)
+    updateTextInput(session, "name", value = "")
+  })
+  
+  output$names <- renderText(r$names)
+}
+shinyApp(ui, server)
+```
+
+```{r}
+ui <- fluidPage(
+  textInput("name", "name"),
+  actionButton("add", "add"),
+  actionButton("del", "delete"),
+  textOutput("names")
+)
+server <- function(input, output, session) {
+  r <- reactiveValues(names = character())
+  observeEvent(input$add, {
+    r$names <- union(r$names, input$name)
+    updateTextInput(session, "name", value = "")
+  })
+  observeEvent(input$del, {
+    r$names <- setdiff(r$names, input$name)
+    updateTextInput(session, "name", value = "")
+  })
+  
+  output$names <- renderText(r$names)
+}
+shinyApp(ui, server)
+```
+
+### Pausing animations
+
+```{r}
+library(shiny)
+ui <- fluidPage(
+  actionButton("start", "start"),
+  actionButton("stop", "stop"),
+  textOutput("n")
+)
+server <- function(input, output, session) {
+  r <- reactiveValues(running = FALSE, n = 0)
+
+  observeEvent(input$start, {
+    r$running <- TRUE
+  })
+  observeEvent(input$stop, {
+    r$running <- FALSE
+  })
+  
+  observe({
+    if (r$running) {
+      r$n <- isolate(r$n) + 1
+      invalidateLater(250)
+    }
+  })
+  output$n <- renderText(r$n)
+}
+shinyApp(ui, server)
+```

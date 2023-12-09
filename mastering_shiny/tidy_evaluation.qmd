@@ -8,7 +8,267 @@ editor: visual
 
 
 ```{r}
-#| echo: false
-2 * 2
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("var", "Variable", choices = num_vars),
+  numericInput("min", "Minimum", value = 1),
+  tableOutput("output")
+)
+server <- function(input, output, session) {
+  data <- reactive(diamonds %>% filter(input$var > input$min))
+  output$output <- renderTable(head(data()))
+}
+
+shinyApp(ui, server)
 ```
+
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("var", "Variable", choices = num_vars),
+  numericInput("min", "Minimum", value = 1),
+  tableOutput("output")
+)
+server <- function(input, output, session) {
+  data <- reactive(diamonds %>% filter(.data[[input$var]] > .env$input$min))
+  output$output <- renderTable(head(data()))
+}
+
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("x", "X variable", choices = names(iris)),
+  selectInput("y", "Y variable", choices = names(iris)),
+  plotOutput("plot")
+)
+server <- function(input, output, session) {
+  output$plot <- renderPlot({
+    ggplot(iris, aes(.data[[input$x]], .data[[input$y]])) +
+      geom_point(position = ggforce::position_auto())
+  }, res = 96)
+}
+
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("x", "X variable", choices = names(iris)),
+  selectInput("y", "Y variable", choices = names(iris)),
+  selectInput("geom", "geom", c("point", "smooth", "jitter")),
+  plotOutput("plot")
+)
+server <- function(input, output, session) {
+  plot_geom <- reactive({
+    switch(input$geom,
+      point = geom_point(),
+      smooth = geom_smooth(se = FALSE),
+      jitter = geom_jitter()
+    )
+  })
+  
+  output$plot <- renderPlot({
+    ggplot(iris, aes(.data[[input$x]], .data[[input$y]])) +
+      plot_geom()
+  }, res = 96)
+}
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("var", "Select variable", choices = names(mtcars)),
+  sliderInput("min", "Minimum value", 0, min = 0, max = 100),
+  selectInput("sort", "Sort by", choices = names(mtcars)),
+  tableOutput("data")
+)
+server <- function(input, output, session) {
+  observeEvent(input$var, {
+    rng <- range(mtcars[[input$var]])
+    updateSliderInput(
+      session, "min", 
+      value = rng[[1]], 
+      min = rng[[1]], 
+      max = rng[[2]]
+    )
+  })
+  
+  output$data <- renderTable({
+    mtcars %>% 
+      filter(.data[[input$var]] > input$min) %>% 
+      arrange(.data[[input$sort]])
+  })
+}
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("var", "Sort by", choices = names(mtcars)),
+  checkboxInput("desc", "Descending order?"),
+  tableOutput("data")
+)
+server <- function(input, output, session) {
+  sorted <- reactive({
+    if (input$desc) {
+      arrange(mtcars, desc(.data[[input$var]]))
+    } else {
+      arrange(mtcars, .data[[input$var]])
+    }
+  })
+  output$data <- renderTable(sorted())
+}
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  fileInput("data", "dataset", accept = ".tsv"),
+  selectInput("var", "var", character()),
+  numericInput("min", "min", 1, min = 0, step = 1),
+  tableOutput("output")
+)
+server <- function(input, output, session) {
+  data <- reactive({
+    req(input$data)
+    vroom::vroom(input$data$datapath)
+  })
+  observeEvent(data(), {
+    updateSelectInput(session, "var", choices = names(data()))
+  })
+  observeEvent(input$var, {
+    val <- data()[[input$var]]
+    updateNumericInput(session, "min", value = min(val))
+  })
+  
+  output$output <- renderTable({
+    req(input$var)
+    
+    data() %>% 
+      filter(.data[[input$var]] > input$min) %>% 
+      arrange(.data[[input$var]]) %>% 
+      head(10)
+  })
+}
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("vars", "Variables", names(mtcars), multiple = TRUE),
+  tableOutput("data")
+)
+
+server <- function(input, output, session) {
+  output$data <- renderTable({
+    req(input$vars)
+    mtcars %>% select(all_of(input$vars))
+  })
+}
+shinyApp(ui, server)
+```
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("vars", "Variables", names(mtcars), multiple = TRUE),
+  tableOutput("count")
+)
+
+server <- function(input, output, session) {
+  output$count <- renderTable({
+    req(input$vars)
+    
+    mtcars %>% 
+      group_by(across(all_of(input$vars))) %>% 
+      summarise(n = n(), .groups = "drop")
+  })
+}
+shinyApp(ui, server)
+```
+
+
+```{r}
+library(shiny)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+
+num_vars <- c("carat", "depth", "table", "price", "x", "y", "z")
+ui <- fluidPage(
+  selectInput("vars_g", "Group by", names(mtcars), multiple = TRUE),
+  selectInput("vars_s", "Summarise", names(mtcars), multiple = TRUE),
+  tableOutput("data")
+)
+
+server <- function(input, output, session) {
+  output$data <- renderTable({
+    mtcars %>% 
+      group_by(across(all_of(input$vars_g))) %>% 
+      summarise(across(all_of(input$vars_s), mean), n = n())
+  })
+}
+shinyApp(ui, server)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
