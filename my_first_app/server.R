@@ -202,10 +202,17 @@ server <- function(input, output, session) {
 
     leaflet() %>%
       addTiles(group = "OSM") %>%
-      addMarkers(
+      addAwesomeMarkers(
         lng=mapping_location$lng, 
         lat=mapping_location$lat, 
-        popup=mapping_location_key
+        popup=mapping_location_key,
+        icon = awesomeIcons(
+          icon = 'flag',
+          iconColor = 'black',
+          markerColor = "blue",
+          squareMarker = TRUE,
+          library = 'fa'
+        )
       ) %>%
       setView(
         lng=mapping_location$lng, 
