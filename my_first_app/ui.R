@@ -13,11 +13,10 @@ ui <- page_sidebar(
     accordion(
       accordion_panel(
         "Inputs",
-        selectInput(
+        radioButtons(
           "dataset", "Dataset",
           dataset_choices,
-          multiple = FALSE,
-          selectize = TRUE
+          inline = TRUE
         ),
         selectInput(
           "x_col",
