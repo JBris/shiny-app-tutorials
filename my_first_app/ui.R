@@ -14,7 +14,12 @@ ui <- page_sidebar(
       accordion_panel(
         "Inputs",
         radioButtons(
-          "dataset", "Dataset",
+          "dataset", 
+          tooltip(
+            span("Dataset", bsicons::bs_icon("question-circle-fill")),
+            "Select explanatory and response variables for a dataset.",
+            placement = "left"
+          ),
           dataset_choices,
           inline = TRUE
         ),
@@ -36,7 +41,12 @@ ui <- page_sidebar(
       accordion_panel(
         "Mapping",
         selectInput(
-          "mapping_location", "Location",
+          "mapping_location", 
+          tooltip(
+            span("Location", bsicons::bs_icon("question-circle-fill")),
+            "Select the view location for the map.",
+            placement = "left"
+          ),
           location_choices,
           multiple = FALSE,
           selectize = TRUE
